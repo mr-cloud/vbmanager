@@ -1,14 +1,10 @@
 from flask import Flask
 from flask import jsonify
-from vbmanager import VBManager as vbm
-from vbmanager import services
+from vbmanager import VBManager
 
 app = Flask(__name__)
-app.config["VBMANAGER_URL_PREFIX"] = "/vbmanager"
-app.config["VBMANAGER_SITEURL"] = "http://localhost:8000"
-app.config["VBMANAGER_SITENAME"] = "My Site"
 
-vb = vbm()
+vb = VBManager()
 
 
 @app.route("/")
@@ -21,4 +17,4 @@ def scale_out():
     return jsonify(vb.create_config_VM())
 
 if __name__ == "__main__":
-    app.run(debug=True, host='0.0.0.0', port=8000, use_reloader=True)
+    app.run(debug=True, host='0.0.0.0', port=5000, use_reloader=True)

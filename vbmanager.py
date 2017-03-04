@@ -25,7 +25,7 @@ class VBManager:
             if vm.state == 1 and vm.name != 'namenode':
                 # start existed and power-offed VM.
                 try:
-                    completedProcess = subprocess.run("vboxmanage startvm {} --type headless".format(vm.name).split(), \
+                    subprocess.run("vboxmanage startvm {} --type headless".format(vm.name).split(), \
                                    stdout=subprocess.PIPE, check=True)
                 except subprocess.CalledProcessError:
                     print('Hot VM creation failed!')
@@ -39,7 +39,7 @@ class VBManager:
             # create a new VM by cloning.
             try:
                 new_vm_name = 'data' + str(self.vbox.machines.__len__())
-                completedProcess = subprocess.run(
+                subprocess.run(
                     "vboxmanage clonevm data1 --snapshot {} --name {} --register"\
                         .format(self.cold_vm_snapshot, new_vm_name).split(), \
                     stdout=subprocess.PIPE, check=True)
@@ -47,7 +47,7 @@ class VBManager:
                 print('Cold VM creation failed: Clone VM error.')
                 return {'rst': 'fail'}
             try:
-                completedProcess = subprocess.run("vboxmanage startvm {} --type headless".format(new_vm_name).split(), \
+                subprocess.run("vboxmanage startvm {} --type headless".format(new_vm_name).split(), \
                                                   stdout=subprocess.PIPE, check=True)
             except subprocess.CalledProcessError:
                 print('Cold VM creation failed: Start VM error.')
