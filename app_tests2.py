@@ -7,7 +7,7 @@ class AppTester(unittest.TestCase):
         self.app = app.app.test_client()
 
     def tearDown(self):
-        super().tearDown()
+        pass
 
     def test_list_services(self):
         rv = self.app.get('/')
@@ -16,7 +16,13 @@ class AppTester(unittest.TestCase):
 
     # def test_scale_out(self):
     #     rv = self.app.get('/scale-out')
+    #     print(rv.data)
     #     assert 'rst' in rv.data
+
+    def test_scale_in(self):
+        rv = self.app.get('/scale-in')
+        print(rv.data)
+        assert 'rst' in rv.data
 
 if __name__ == '__main__':
     unittest.main()
