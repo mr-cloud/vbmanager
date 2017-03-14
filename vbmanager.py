@@ -15,30 +15,23 @@ class VBManager:
     def __init__(self):
         self.services = services
         self.vbox = vb.VirtualBox()
-        self.cold_vm_snapshot = 'scaling'
+        self.cold_vm_snapshot = 'supervisor'
 
     def list_all(self):
-        return {'rst': 'success', 'data': self.services}
+        return {'rst': 'success', 'msg': self.services}
 
     def create_config_VM(self):
         isHotVM = False
         for vm in self.vbox.machines:
             if vm.state == 1 and vm.name != 'namenode':
                 # start an existed and power-offed VM.
-                print('Starting VM %s ...' % vm.name)
-                try:
-                    subprocess.check_call("vboxmanage startvm {} --type headless".format(vm.name).split(), \
-                                   stdout=subprocess.PIPE)
-                except subprocess.CalledProcessError:
-                    print('Hot VM creation failed!')
-                    return {'rst': 'fail'}
                 isHotVM = True
                 bootup_vm = vm.name
                 break
         if not isHotVM:
             if self.vbox.machines.__len__() >= CLUSTER_MAX_SIZE:
                 print('Cold VM creation failed: Beyond the cluster size limitation.')
-                return {'rst': 'fail'}
+                return {'rst': 'fail', 'msg': 'Cold VM creation failed: Beyond the cluster size limitation.'}
             # create a new VM by cloning.
             datanode_num = str(self.vbox.machines.__len__())
             new_vm_name = 'data' + datanode_num
@@ -50,14 +43,14 @@ class VBManager:
                     stdout=subprocess.PIPE)
             except subprocess.CalledProcessError:
                 print('Cold VM creation failed: Clone VM error.')
-                return {'rst': 'fail'}
+                return {'rst': 'fail', 'msg': 'Cold VM creation failed: Clone VM error.'}
             print('Starting a VM %s ...' % new_vm_name)
             try:
                 subprocess.check_call("vboxmanage startvm {} --type headless".format(new_vm_name).split(), \
                                                   stdout=subprocess.PIPE)
             except subprocess.CalledProcessError:
                 print('Cold VM creation failed: Start VM error.')
-                return {'rst': 'fail'}
+                return {'rst': 'fail', 'msg': 'Cold VM creation failed: Start VM error.'}
             # config VM
             vm = self.vbox.find_machine(new_vm_name)
             time.sleep(15)
@@ -68,41 +61,72 @@ class VBManager:
                     timeout -= 5
                 else:
                     print('VM creation failed: Timeout.')
-                    return {'rst': 'fail'}
+                    return {'rst': 'fail', 'msg': 'VM creation failed: Timeout.'}
             print('Configuring a VM %s ...' % new_vm_name)
-            with vm.create_session() as session:
-                time.sleep(15)
-                with session.console.guest.create_session('storm', '14641') as gs:
-                    time.sleep(15)
-                    _, o, e = gs.execute('/usr/bin/sudo', ['/home/storm/lab/config_VM.py', ('%s' % datanode_num)])
-                    print('config output: ' + str(o))
-                    print('config error: ' + str(e))
-            time.sleep(15)
-            print('Restarting a VM %s ...' % new_vm_name)
+            _, o, e = self.execute_cmd(vm, '/usr/bin/sudo', ['/home/storm/lab/config_VM.py', ('%s' % datanode_num)], 15)
+            print('config output: ', o)
+            print('config error: ', e)
+            print('Saving state for VM %s ...' % new_vm_name)
             try:
-                subprocess.check_call("vboxmanage controlvm {} reset".format(new_vm_name).split(), \
+                subprocess.check_call("vboxmanage controlvm {} savestate".format(new_vm_name).split(), \
                                       stdout=subprocess.PIPE)
             except subprocess.CalledProcessError:
-                print('Cold VM creation failed: Reset VM error.')
-                return {'rst': 'fail'}
+                print('Cold VM creation failed: Savestate VM error.')
+                return {'rst': 'fail', 'msg': 'Cold VM creation failed: Savestate VM error.'}
+            time.sleep(10)
             bootup_vm = new_vm_name
+        # start VM.
+        print('Starting VM %s ...' % bootup_vm)
+        try:
+            subprocess.check_call("vboxmanage startvm {} --type headless".format(bootup_vm).split(), \
+                                  stdout=subprocess.PIPE)
+        except subprocess.CalledProcessError:
+            print('Hot VM creation failed!')
+            return {'rst': 'fail', 'msg': 'Hot VM creation failed!'}
+        time.sleep(15)
+        if not isHotVM:
+            # restart to ensure the network configuration is OK.
+            print('Restart VM %s to ensure the network configuration is OK ...' % bootup_vm)
+            try:
+                subprocess.check_call("vboxmanage controlvm {} reset".format(bootup_vm).split(), \
+                                      stdout=subprocess.PIPE)
+            except subprocess.CalledProcessError:
+                print('Reset VM failed!')
+                return {'rst': 'fail', 'msg': 'Reset VM failed!'}
+            time.sleep(20)
         # check if VM is running.
         vm = self.vbox.find_machine(bootup_vm)
-        time.sleep(20)
-        timeout = 10
+        timeout = 15
         while vm.state != 5:
             if timeout > 0:
                 time.sleep(5)
                 timeout -= 5
             else:
                 print('VM creation failed: Timeout.')
-                return {'rst': 'fail'}
-        return {'rst': 'success'}
+                return {'rst': 'fail', 'msg': 'VM creation failed: Timeout.'}
+        print('Starting datanode VM %s ...' % bootup_vm)
+        # try:
+        #     subprocess.check_call("vboxmanage guestcontrol {} run --exe /home/storm/lab/supervisor_up.py"
+        #                           " --no-wait-stdout --no-wait-stderr --username storm --password 14641 ".format(bootup_vm).split(), \
+        #                           stdout=subprocess.PIPE)
+        # except subprocess.CalledProcessError:
+        #     print('Starting datanode failed!')
+        #     return {'rst': 'fail', 'msg': 'Starting datanode failed!'}
+        # time.sleep(20)
+        _, o, e = self.execute_cmd(vm=vm, cmd='/home/storm/lab/supervisor_up.py', params=[],
+                                   waittime=20)
+        print('Storm supervisor out: ', o)
+        print('Storm supervisor err: ', e)
+        return {'rst': 'success', 'msg': bootup_vm}
 
     def shrink_VM(self):
-        if len(self.vbox.machines) <= CLUSTER_MIN_SIZE:
+        num_running_vms = 0
+        for vm in self.vbox.machines:
+            if vm.state == 5:
+                num_running_vms += 1
+        if num_running_vms <= CLUSTER_MIN_SIZE:
             print('VM shinkage failed: Beyond the cluster size limitation.')
-            return {'rst': 'fail'}
+            return {'rst': 'fail', 'msg': 'VM shinkage failed: Beyond the cluster size limitation.'}
         for vm in self.vbox.machines:
             if vm.state == 5 and vm.name not in ['namenode', 'data1', 'data2']:
                 # shutdown an existed and running VM.
@@ -112,12 +136,20 @@ class VBManager:
                                    stdout=subprocess.PIPE)
                 except subprocess.CalledProcessError:
                     print('VM shutdown failed!')
-                    return {'rst': 'fail'}
-                time.sleep(5)
+                    return {'rst': 'fail', 'msg': 'VM shutdown failed!'}
+                time.sleep(10)
                 if vm.state != 1:
                     print('VM shutdown failed: %s' % vm.name)
-                    return {'rst': 'fail'}
+                    return {'rst': 'fail', 'msg': 'VM shutdown failed: %s' % vm.name}
                 else:
-                    return {'rst': 'success'}
+                    return {'rst': 'success', 'msg': vm.name}
         return {'rst': 'fail'}
+
+    def execute_cmd(self, vm, cmd, params, waittime):
+        with vm.create_session() as session:
+            time.sleep(15)
+            with session.console.guest.create_session('storm', '14641') as gs:
+                time.sleep(15)
+                p, o, e = gs.execute(cmd, params, timeout_ms=waittime * 1000)
+        return p, o, e
 

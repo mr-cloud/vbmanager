@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 import sys
+import os
 
 
 if __name__ == '__main__':
@@ -23,6 +24,7 @@ if __name__ == '__main__':
     filename = '/etc/hostname'
     with open(filename, 'w') as hostname:
         hostname.write('data' + str(datanode_num) + '\n')
+    os.system('rm -rf /home/storm/datahouse/storm/storm-local/')
     print('success!')	
 
 
