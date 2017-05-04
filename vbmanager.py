@@ -17,6 +17,14 @@ class VBManager:
         self.vbox = vb.VirtualBox()
         self.cold_vm_snapshot = 'supervisor'
 
+    def machines_stats(self):
+        num_running_machines = 0
+        for vm in self.vbox.machines:
+            if vm.state == 5:
+                num_running_machines += 1
+        return {'machinesTotal': len(self.vbox.machines),
+                'machinesRunning': num_running_machines}
+
     def list_all(self):
         return {'rst': 'success', 'msg': self.services}
 
