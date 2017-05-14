@@ -5,7 +5,8 @@ import subprocess
 
 services = {
     1: "CREATE_VM",
-    2: "DELETE_VM"
+    2: "DELETE_VM",
+    3: "MACHINES_STATS"
 }
 CLUSTER_MAX_SIZE = 7
 CLUSTER_MIN_SIZE = 3
