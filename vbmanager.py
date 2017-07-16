@@ -123,7 +123,7 @@ class VBManager:
         #     return {'rst': 'fail', 'msg': 'Starting datanode failed!'}
         # time.sleep(20)
         _, o, e = self.execute_cmd(vm=vm, cmd='/home/storm/lab/supervisor_up.py', params=[],
-                                   waittime=20)
+                                   waittime=25)
         print('Storm supervisor out: ', o)
         print('Storm supervisor err: ', e)
         return {'rst': 'success', 'msg': bootup_vm}
@@ -156,9 +156,9 @@ class VBManager:
 
     def execute_cmd(self, vm, cmd, params, waittime):
         with vm.create_session() as session:
-            time.sleep(15)
+            time.sleep(20)
             with session.console.guest.create_session('storm', '14641') as gs:
-                time.sleep(15)
+                time.sleep(20)
                 p, o, e = gs.execute(cmd, params, timeout_ms=waittime * 1000)
         return p, o, e
 
