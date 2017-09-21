@@ -1,0 +1,24 @@
+@startuml
+
+class services {
+    1 = "CREATE_VM",
+    2 = "DELETE_VM",
+    3 = "MACHINES_STATS"
+}
+interface IVirtualBox
+
+class VBManager {
+-services : services
+-vbox : IVirtualBox
+-cold_vm_snapshot : str
++machines_stats() : dict
++list_all() : dict
++create_config_VM() : dict
++shrink_VM() : dict
+-execute_cmd() : dict
+}
+
+IVirtualBox o-- VBManager
+services *-- VBManager
+
+@enduml
