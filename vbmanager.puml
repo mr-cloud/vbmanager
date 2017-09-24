@@ -18,7 +18,7 @@ class VBManager {
 -execute_cmd() : dict
 }
 
-IVirtualBox o-- VBManager
-services *-- VBManager
+IVirtualBox *-- VBManager
+services o-- VBManager
 
 @enduml
